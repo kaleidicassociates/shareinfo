@@ -1,4 +1,5 @@
-import std.stdio : writeln;
+import std.stdio : writeln, writefln;
+import std.conv;
 import core.stdc.string : strlen;
 import core.stdc.wchar_ : wcslen;
 //import core.sys.windows.lmshare;
@@ -50,6 +51,30 @@ extern (Windows) struct SESSION_INFO_10 {
     DWORD  sesi10_idle_time;
 }
 
+extern(Windows) struct SESSION_INFO_503 {
+  LPWSTR               shi503_netname;
+  DWORD                shi503_type;
+  LPWSTR               shi503_remark;
+  DWORD                shi503_permissions;
+  DWORD                shi503_max_uses;
+  DWORD                shi503_current_uses;
+  LPWSTR               shi503_path;
+  LPWSTR               shi503_passwd;
+  LPWSTR               shi503_servername;
+  DWORD                shi503_reserved;
+  void* shi503_security_descriptor;
+}
+
+
+struct SERVER_INFO_101 {
+  DWORD  sv101_platform_id;
+  LPWSTR sv101_name;
+  DWORD  sv101_version_major;
+  DWORD  sv101_version_minor;
+  DWORD  sv101_type;
+  LPWSTR sv101_comment;
+}
+
 alias net_api_bufer_free = extern (Windows) NET_API_STATUS function (
     LPVOID Buffer
     );
@@ -80,35 +105,132 @@ alias net_session_enum = extern (Windows) NET_API_STATUS function (
 
 
 
+alias net_share_check = extern(Windows) NET_API_STATUS function(
+   LPWSTR  servername,
+  LPWSTR  device,
+  LPDWORD type
+);
+
+alias net_share_enum = extern(Windows) NET_API_STATUS function(
+    LPWSTR  servername,
+    DWORD   level,
+    LPBYTE  *bufptr,
+    DWORD   prefmaxlen,
+    LPDWORD entriesread,
+    LPDWORD totalentries,
+    LPDWORD resume_handle
+);
+
+
+
+alias net_server_enum = extern(Windows) NET_API_STATUS  function (
+    LPWSTR servername, // really LPCWSTR
+    DWORD   level,
+    LPBYTE  *bufptr,
+    DWORD   prefmaxlen,
+    LPDWORD entriesread,
+    LPDWORD totalentries,
+    DWORD   servertype,
+    LPWSTR domain,   // really LPCWSTR
+    LPDWORD resume_handle
+);
+
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
 
-void main()
+void main(string[] args)
 {   
     auto libHandle = LoadLibraryA("Netapi32.dll");
     auto NetFileEnum = cast(net_file_enum)GetProcAddress(libHandle, "NetFileEnum");
     auto NetSessionEnum = cast(net_session_enum)GetProcAddress(libHandle, "NetSessionEnum");
     auto NetApiBufferFree = cast(net_api_bufer_free)GetProcAddress(libHandle, "NetApiBufferFree");
-    
+    auto NetShareCheck = cast(net_share_check)    GetProcAddress(libHandle,"NetShareCheck");
+    auto NetShareEnum = cast(net_share_enum)    GetProcAddress(libHandle,"NetShareEnum");
+    auto NetServerEnum = cast(net_server_enum)    GetProcAddress(libHandle,"NetServerEnum");
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
-    uint entiresread;
+    uint entriesRead;
     uint totalentries;
-    
-    //auto result = NetFileEnum(null, null, null, 3, cast(ubyte**)&bufptr, MAX_PREFERRED_LENGTH, &entiresread, &totalentries, null);
-    auto result = NetSessionEnum(null, null, null, 10, cast(ubyte**)&bufptr, MAX_PREFERRED_LENGTH, &entiresread, &totalentries, null);
+
+    /+
+        NET_API_STATUS NetSessionEnum(
+      _In_    LPWSTR  servername,
+      _In_    LPWSTR  UncClientName,
+      _In_    LPWSTR  username,
+      _In_    DWORD   level,
+      _Out_   LPBYTE  *bufptr,
+      _In_    DWORD   prefmaxlen,
+      _Out_   LPDWORD entriesread,
+      _Out_   LPDWORD totalentries,
+      _Inout_ LPDWORD resume_handle
+    );
+
+    +/
+    wstring serverName;
+
+    if (args.length==1)
+    {
+        writeln("enumerating shares on local computer");
+    }
+    else
+    {
+        serverName=args[1].to!wstring~"\0"w;
+        writefln("enumerating shares on server %s", serverName);
+    }
+    immutable(wchar)* servernamep = (serverName.length ==0) ? null : serverName.ptr;
+    //auto result = NetFileEnum(null, null, null, 3, cast(ubyte**)&bufptr, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
+    auto result = NetSessionEnum(cast(wchar*)(servernamep), null, null, 10, cast(ubyte**)&bufptr, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
 
     scope(exit) NetApiBufferFree(bufptr);
 
     if (result == ERROR_ACCESS_DENIED)
     {
-        writeln("You should run this program with a more priviliged user-level ... yours is insufficient");
+        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
     } else foreach(e; bufptr[0 .. totalentries])
     {
         auto username_string = cast(const)e.sesi10_username[0 .. wcslen(e.sesi10_username)];
         auto computername_string = cast(const)e.sesi10_cname[0 .. wcslen(e.sesi10_cname)];  
         writeln("Computer: ", computername_string, " User: ", username_string);
     }
+
+    auto device=(args.length>2) ? args[2].to!wstring~"\0" : "C"w;
+    immutable(wchar*) devicep = device.ptr;
+    uint sharebitmap;
+    result = NetShareCheck(cast(wchar*)servernamep,cast(wchar*)devicep,&sharebitmap);
+    writefln("result of share check %s, bitmap = %s",result,sharebitmap);
     
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/bb525387(v=vs.85).aspx
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/cc462916(v=vs.85).aspx
+    SESSION_INFO_503* ptr503;
+    result = NetShareEnum(cast(wchar*)servernamep,503,cast(ubyte**) &ptr503, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
+    writefln("result of net share enum %s; totalentries %s; entriesRead %s",result, totalentries, entriesRead);
+    if (result == ERROR_ACCESS_DENIED)
+    {
+        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+    } else foreach(e; ptr503[0 .. entriesRead])
+    {
+        auto share_netname = cast(const)e.shi503_netname[0 .. wcslen(e.shi503_netname)];
+        auto share_path = cast(const)e.shi503_path[0 .. wcslen(e.shi503_path)];  
+        writeln("Netname: ", share_netname, " Path: ", share_path);
+    }
+    SERVER_INFO_101 *ptrServer101;
+    enum  SV_TYPE_NT =0x00001000;
+    enum SV_TYPE_ALL = 0xFFFFFFFF;
+    wstring domain = "OPTIONS-IT\0"w;
+    wchar* domainp = cast(wchar*)domain.ptr;
+    result = NetServerEnum(null,101U,cast(ubyte**) &ptrServer101, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, SV_TYPE_ALL, domainp,null);
+    writefln("result of net server enum %s; totalentries %s; entriesRead %s",result, totalentries, entriesRead);
+    if (result == ERROR_ACCESS_DENIED)
+    {
+        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+    } else foreach(e; ptrServer101[0 .. entriesRead])
+    {
+        auto serverResName = cast(const)e.sv101_name[0 .. wcslen(e.sv101_name)];
+        auto serverComment = cast(const)e.sv101_comment[0 .. wcslen(e.sv101_comment)];  
+        writeln("name: ", serverResName, "comment: ", serverComment);
+    }
 }
+
+//HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
+    
