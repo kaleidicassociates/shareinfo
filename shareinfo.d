@@ -12,6 +12,9 @@ alias NET_API_STATUS = uint;
 alias LPWSTR = wchar*;
 alias LPVOID = void*;
 
+struct SECURITY_DESCRIPTOR;
+alias PPSECURITY_DESCRIPTOR = PSECURITY_DESCRIPTOR*;
+
 enum MAX_PREFERRED_LENGTH = -1;
 enum ERROR_ACCESS_DENIED = 5;
 
@@ -52,19 +55,31 @@ extern (Windows) struct SESSION_INFO_10 {
 }
 
 extern(Windows) struct SESSION_INFO_503 {
-    LPWSTR               shi503_netname;
-    DWORD                shi503_type;
-    LPWSTR               shi503_remark;
-    DWORD                shi503_permissions;
-    DWORD                shi503_max_uses;
-    DWORD                shi503_current_uses;
-    LPWSTR               shi503_path;
-    LPWSTR               shi503_passwd;
-    LPWSTR               shi503_servername;
-    DWORD                shi503_reserved;
-    void*                shi503_security_descriptor;
+    LPWSTR                shi503_netname;
+    DWORD                 shi503_type;
+    LPWSTR                shi503_remark;
+    DWORD                 shi503_permissions;
+    DWORD                 shi503_max_uses;
+    DWORD                 shi503_current_uses;
+    LPWSTR                shi503_path;
+    LPWSTR                shi503_passwd;
+    LPWSTR                shi503_servername;
+    DWORD                 shi503_reserved;
+    PPSECURITY_DESCRIPTOR shi503_security_descriptor;
 }
 
+extern (Windows) struct SHARE_INFO_502 {
+  LPWSTR               shi502_netname;
+  DWORD                shi502_type;
+  LPWSTR               shi502_remark;
+  DWORD                shi502_permissions;
+  DWORD                shi502_max_uses;
+  DWORD                shi502_current_uses;
+  LPWSTR               shi502_path;
+  LPWSTR               shi502_passwd;
+  DWORD                shi502_reserved;
+  PSECURITY_DESCRIPTOR shi502_security_descriptor;
+}
 
 struct SERVER_INFO_101 {
     DWORD  sv101_platform_id;
@@ -103,8 +118,6 @@ alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPDWORD resume_handle
 );
 
-
-
 alias net_share_check = extern(Windows) NET_API_STATUS function (
     LPWSTR  servername,
     LPWSTR  device,
@@ -123,13 +136,13 @@ alias net_share_enum = extern(Windows) NET_API_STATUS function (
 
 
 alias net_use_enum = extern (Windows) NET_API_STATUS function (
-  _In_    LMSTR   UncServerName,
-  _In_    DWORD   Level,
-  _Out_   LPBYTE  *BufPtr,
-  _In_    DWORD   PreferedMaximumSize,
-  _Out_   LPDWORD EntriesRead,
-  _Out_   LPDWORD TotalEntries,
-  _Inout_ LPDWORD ResumeHandle
+  LMSTR   UncServerName,
+  DWORD   Level,
+  LPBYTE  *BufPtr,
+  DWORD   PreferedMaximumSize,
+  LPDWORD EntriesRead,
+  LPDWORD TotalEntries,
+  LPDWORD ResumeHandle
 );
 
 alias net_server_enum = extern(Windows) NET_API_STATUS function (
