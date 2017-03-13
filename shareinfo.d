@@ -52,32 +52,32 @@ extern (Windows) struct SESSION_INFO_10 {
 }
 
 extern(Windows) struct SESSION_INFO_503 {
-  LPWSTR               shi503_netname;
-  DWORD                shi503_type;
-  LPWSTR               shi503_remark;
-  DWORD                shi503_permissions;
-  DWORD                shi503_max_uses;
-  DWORD                shi503_current_uses;
-  LPWSTR               shi503_path;
-  LPWSTR               shi503_passwd;
-  LPWSTR               shi503_servername;
-  DWORD                shi503_reserved;
-  void* shi503_security_descriptor;
+    LPWSTR               shi503_netname;
+    DWORD                shi503_type;
+    LPWSTR               shi503_remark;
+    DWORD                shi503_permissions;
+    DWORD                shi503_max_uses;
+    DWORD                shi503_current_uses;
+    LPWSTR               shi503_path;
+    LPWSTR               shi503_passwd;
+    LPWSTR               shi503_servername;
+    DWORD                shi503_reserved;
+    void*                shi503_security_descriptor;
 }
 
 
 struct SERVER_INFO_101 {
-  DWORD  sv101_platform_id;
-  LPWSTR sv101_name;
-  DWORD  sv101_version_major;
-  DWORD  sv101_version_minor;
-  DWORD  sv101_type;
-  LPWSTR sv101_comment;
+    DWORD  sv101_platform_id;
+    LPWSTR sv101_name;
+    DWORD  sv101_version_major;
+    DWORD  sv101_version_minor;
+    DWORD  sv101_type;
+    LPWSTR sv101_comment;
 }
 
 alias net_api_bufer_free = extern (Windows) NET_API_STATUS function (
     LPVOID Buffer
-    );
+);
 
 alias net_file_enum = extern (Windows) NET_API_STATUS function (
     LMSTR      servername, /// null for localhost
@@ -89,7 +89,7 @@ alias net_file_enum = extern (Windows) NET_API_STATUS function (
     LPDWORD    entriesread,
     LPDWORD    totalentries,
     PDWORD_PTR resume_handle
-    );
+);
 
 alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPWSTR  servername,
@@ -101,17 +101,17 @@ alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPDWORD entriesread,
     LPDWORD totalentries,
     LPDWORD resume_handle
-    );
-
-
-
-alias net_share_check = extern(Windows) NET_API_STATUS function(
-   LPWSTR  servername,
-  LPWSTR  device,
-  LPDWORD type
 );
 
-alias net_share_enum = extern(Windows) NET_API_STATUS function(
+
+
+alias net_share_check = extern(Windows) NET_API_STATUS function (
+    LPWSTR  servername,
+    LPWSTR  device,
+    LPDWORD type
+);
+
+alias net_share_enum = extern(Windows) NET_API_STATUS function (
     LPWSTR  servername,
     DWORD   level,
     LPBYTE  *bufptr,
@@ -122,8 +122,17 @@ alias net_share_enum = extern(Windows) NET_API_STATUS function(
 );
 
 
+alias net_use_enum = extern (Windows) NET_API_STATUS function (
+  _In_    LMSTR   UncServerName,
+  _In_    DWORD   Level,
+  _Out_   LPBYTE  *BufPtr,
+  _In_    DWORD   PreferedMaximumSize,
+  _Out_   LPDWORD EntriesRead,
+  _Out_   LPDWORD TotalEntries,
+  _Inout_ LPDWORD ResumeHandle
+);
 
-alias net_server_enum = extern(Windows) NET_API_STATUS  function (
+alias net_server_enum = extern(Windows) NET_API_STATUS function (
     LPWSTR servername, // really LPCWSTR
     DWORD   level,
     LPBYTE  *bufptr,
@@ -139,34 +148,29 @@ extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
 
+void insufficientPermissions()
+{
+    writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+}
+
 void main(string[] args)
 {   
     auto libHandle = LoadLibraryA("Netapi32.dll");
-    auto NetFileEnum = cast(net_file_enum)GetProcAddress(libHandle, "NetFileEnum");
-    auto NetSessionEnum = cast(net_session_enum)GetProcAddress(libHandle, "NetSessionEnum");
-    auto NetApiBufferFree = cast(net_api_bufer_free)GetProcAddress(libHandle, "NetApiBufferFree");
-    auto NetShareCheck = cast(net_share_check)    GetProcAddress(libHandle,"NetShareCheck");
-    auto NetShareEnum = cast(net_share_enum)    GetProcAddress(libHandle,"NetShareEnum");
-    auto NetServerEnum = cast(net_server_enum)    GetProcAddress(libHandle,"NetServerEnum");
+    //TODO move those functions with their typedefs into a seperate file and initialize the pointers in a shared module constructor
+
+    auto NetFileEnum = cast(net_file_enum) GetProcAddress(libHandle, "NetFileEnum");
+    auto NetSessionEnum = cast(net_session_enum) GetProcAddress(libHandle, "NetSessionEnum");
+    auto NetApiBufferFree = cast(net_api_bufer_free) GetProcAddress(libHandle, "NetApiBufferFree");
+    auto NetShareCheck = cast(net_share_check) GetProcAddress(libHandle, "NetShareCheck");
+    auto NetShareEnum = cast(net_share_enum) GetProcAddress(libHandle, "NetShareEnum");
+    auto NetServerEnum = cast(net_server_enum) GetProcAddress(libHandle, "NetServerEnum");
+    auto NetUseEnum = cast(net_use_enum) GetProcAddress(libHandle, "NetUseEnum");
+
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
     uint entriesRead;
     uint totalentries;
 
-    /+
-        NET_API_STATUS NetSessionEnum(
-      _In_    LPWSTR  servername,
-      _In_    LPWSTR  UncClientName,
-      _In_    LPWSTR  username,
-      _In_    DWORD   level,
-      _Out_   LPBYTE  *bufptr,
-      _In_    DWORD   prefmaxlen,
-      _Out_   LPDWORD entriesread,
-      _Out_   LPDWORD totalentries,
-      _Inout_ LPDWORD resume_handle
-    );
-
-    +/
     wstring serverName;
 
     if (args.length==1)
@@ -186,7 +190,7 @@ void main(string[] args)
 
     if (result == ERROR_ACCESS_DENIED)
     {
-        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+        insufficientPermissions();
     } else foreach(e; bufptr[0 .. totalentries])
     {
         auto username_string = cast(const)e.sesi10_username[0 .. wcslen(e.sesi10_username)];
@@ -199,15 +203,19 @@ void main(string[] args)
     uint sharebitmap;
     result = NetShareCheck(cast(wchar*)servernamep,cast(wchar*)devicep,&sharebitmap);
     writefln("result of share check %s, bitmap = %s",result,sharebitmap);
-    
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/bb525387(v=vs.85).aspx
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/cc462916(v=vs.85).aspx
+
+    /* related docs :
+     *
+     * https://msdn.microsoft.com/en-us/library/windows/desktop/bb525387(v=vs.85).aspx
+     * https://msdn.microsoft.com/en-us/library/windows/desktop/cc462916(v=vs.85).aspx
+     */
+
     SESSION_INFO_503* ptr503;
     result = NetShareEnum(cast(wchar*)servernamep,503,cast(ubyte**) &ptr503, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
     writefln("result of net share enum %s; totalentries %s; entriesRead %s",result, totalentries, entriesRead);
     if (result == ERROR_ACCESS_DENIED)
     {
-        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+        insufficientPermissions();
     } else foreach(e; ptr503[0 .. entriesRead])
     {
         auto share_netname = cast(const)e.shi503_netname[0 .. wcslen(e.shi503_netname)];
@@ -223,7 +231,7 @@ void main(string[] args)
     writefln("result of net server enum %s; totalentries %s; entriesRead %s",result, totalentries, entriesRead);
     if (result == ERROR_ACCESS_DENIED)
     {
-        writeln("You should run this program with a more privileged user-level ... yours is insufficient");
+        insufficientPermissions();
     } else foreach(e; ptrServer101[0 .. entriesRead])
     {
         auto serverResName = cast(const)e.sv101_name[0 .. wcslen(e.sv101_name)];
@@ -233,4 +241,3 @@ void main(string[] args)
 }
 
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
-    
