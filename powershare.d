@@ -290,7 +290,13 @@ void main(string[] args)
         start = 1;
     foreach(i,server;servers[start-1..end])
     {
-        writefln("server: %s/%s : %s", i+start,servers.length,server);
+        bool skip = false;
+        if (!server.startsWith("SYM"))
+            skip=true;
+        string skipping = (skip)? "skipping":"";
+        writefln("server: %s/%s : %s - %s", i+start,servers.length,server, skipping);
+        if(skip)
+            continue;
         serverName = (server~ "\0").to!wstring;
         immutable(wchar)* servernamep = (serverName.length ==0) ? null : serverName.ptr;
         //auto result = NetFileEnum(null, null, null, 3, cast(ubyte**)&bufptr, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
