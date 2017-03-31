@@ -3,6 +3,18 @@ import std.conv;
 import core.stdc.string : strlen;
 import core.stdc.wchar_ : wcslen;
 //import core.sys.windows.lmshare;
+
+enum AnonymousEnum(EnumType, string fqnEnumType = EnumType.stringof) = (){
+  string AnonymousEnum = "enum {";
+  foreach(m;__traits(allMembers, EnumType))
+  {
+      AnonymousEnum ~= m ~ " = " ~ fqnEnumType ~ "." ~ m ~ ",";
+  }
+  AnonymousEnum  ~= "}";
+  return AnonymousEnum;
+}();
+
+
 version = Unicode;
 alias DWORD = uint;
 alias LPDWORD = uint*;
@@ -11,13 +23,32 @@ alias PDWORD_PTR = size_t*;
 alias NET_API_STATUS = uint;
 alias LPWSTR = wchar*;
 alias LPVOID = void*;
+alias HANDLE = void*; // not sure about this one
+alias LPHANDLE = HANDLE*; 
+alias LPNETRESOURCEA = NETRESOURCEA*;
+
 
 struct SECURITY_DESCRIPTOR;
 alias PSECURITY_DESCRIPTOR = SECURITY_DESCRIPTOR*;
 alias PPSECURITY_DESCRIPTOR = PSECURITY_DESCRIPTOR*;
 
 enum MAX_PREFERRED_LENGTH = -1;
-enum ERROR_ACCESS_DENIED = 5;
+/*
+ * Usuaal windows function error_code return values
+ * official list here: https://msdn.microsoft.com/en-us/library/cc231199.aspx
+ * Extend this as needed
+ */
+
+enum system_error_code : uint
+{
+    ERROR_SUCCESS = 0,
+    ERROR_ACCESS_DENIED = 5,
+    ERROR_NOT_ENOUGH_MEMORY = 8,
+    ERROR_BAD_NETPATH = 53,
+    ERROR_MORE_DATA = 234,
+    ERROR_NO_BROWSER_SERVERS_FOUND = 6118,
+}
+mixin(AnonymousEnum!system_error_code);
 
 version (Unicode)
 {
@@ -158,6 +189,34 @@ alias net_server_enum = extern(Windows) NET_API_STATUS function (
     LPDWORD resume_handle
 );
 
+// ---------------------wnet functions---------------------------------
+extern (Windows) struct NETRESOURCEA {
+  DWORD  dwScope;
+  DWORD  dwType;
+  DWORD  dwDisplayType;
+  DWORD  dwUsage;
+  alias LPTSTR = char*;
+  LPTSTR lpLocalName;
+  LPTSTR lpRemoteName;
+  LPTSTR lpComment;
+  LPTSTR lpProvider;
+}
+
+alias wnet_open_enum_a = extern(Windows) system_error_code function (
+  DWORD         dwScope,
+  DWORD         dwType,
+  DWORD         dwUsage,
+  NETRESOURCEA  *lpNetResource,
+  LPHANDLE      lphEnum // out
+);
+
+alias wnet_enum_resource_a = extern (Windows) system_error_code function (
+  HANDLE  hEnum,
+  LPDWORD lpcCount, //inout
+  LPVOID  lpBuffer, //out
+  LPDWORD lpBufferSize //inout
+);
+
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
@@ -169,20 +228,26 @@ void insufficientPermissions()
 
 void main(string[] args)
 {   
-    auto libHandle = LoadLibraryA("Netapi32.dll");
+    auto netapi32_handle = LoadLibraryA("Netapi32.dll");
+    auto mpr_handle = LoadLibraryA("Mpr.dll");
     //TODO move those functions with their typedefs into a seperate file and initialize the pointers in a shared module constructor
 
-    auto NetFileEnum = cast(net_file_enum) GetProcAddress(libHandle, "NetFileEnum");
-    auto NetSessionEnum = cast(net_session_enum) GetProcAddress(libHandle, "NetSessionEnum");
-    auto NetApiBufferFree = cast(net_api_bufer_free) GetProcAddress(libHandle, "NetApiBufferFree");
-    auto NetShareCheck = cast(net_share_check) GetProcAddress(libHandle, "NetShareCheck");
-    auto NetShareEnum = cast(net_share_enum) GetProcAddress(libHandle, "NetShareEnum");
-    auto NetServerEnum = cast(net_server_enum) GetProcAddress(libHandle, "NetServerEnum");
-    auto NetUseEnum = cast(net_use_enum) GetProcAddress(libHandle, "NetUseEnum");
+    auto NetFileEnum = cast(net_file_enum) GetProcAddress(netapi32_handle, "NetFileEnum");
+    auto NetSessionEnum = cast(net_session_enum) GetProcAddress(netapi32_handle, "NetSessionEnum");
+    auto NetApiBufferFree = cast(net_api_bufer_free) GetProcAddress(netapi32_handle, "NetApiBufferFree");
+    auto NetShareCheck = cast(net_share_check) GetProcAddress(netapi32_handle, "NetShareCheck");
+    auto NetShareEnum = cast(net_share_enum) GetProcAddress(netapi32_handle, "NetShareEnum");
+    auto NetServerEnum = cast(net_server_enum) GetProcAddress(netapi32_handle, "NetServerEnum");
+    auto NetUseEnum = cast(net_use_enum) GetProcAddress(netapi32_handle, "NetUseEnum");
+    
+    auto WNetOpenEnumA = cast(wnet_open_enum_a) GetProcAddress(mpr_handle, "WNetOpenEnumA");
+    auto WNetEnumResourceA = cast(wnet_enum_resource_a) GetProcAddress(mpr_handle, "WNetEnumResourceA");
 
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
     uint entriesRead;
+    HANDLE wnetEnumHandle;
+
     uint totalentries;
 
     wstring serverName;
