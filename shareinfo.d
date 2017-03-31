@@ -217,6 +217,10 @@ alias wnet_enum_resource_a = extern (Windows) system_error_code function (
   LPDWORD lpBufferSize //inout
 );
 
+alias wnet_close_enum = extern (Windows) system_error_code function (
+    HANDLE hEnum
+};
+
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
@@ -242,6 +246,7 @@ void main(string[] args)
     
     auto WNetOpenEnumA = cast(wnet_open_enum_a) GetProcAddress(mpr_handle, "WNetOpenEnumA");
     auto WNetEnumResourceA = cast(wnet_enum_resource_a) GetProcAddress(mpr_handle, "WNetEnumResourceA");
+    auto WNetCloseEnum = cast (wnet_close_enum) GetProcAddress(mpr_handle, "WNetCloseEnum");
 
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
