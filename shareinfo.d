@@ -219,7 +219,7 @@ alias wnet_enum_resource_a = extern (Windows) system_error_code function (
 
 alias wnet_close_enum = extern (Windows) system_error_code function (
     HANDLE hEnum
-};
+);
 
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
