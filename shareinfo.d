@@ -224,6 +224,30 @@ alias wnet_close_enum = extern (Windows) system_error_code function (
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
+enum Resource : uint
+{
+    RESOURCE_CONNECTED = 1,
+    RESOURCE_GLOBALNET = 2,
+    RESOURCE_REMEMBERED = 3,
+}
+mixin(AnonymousEnum!Resource);
+
+enum ResourceType : uint
+{
+    RESOURCETYPE_ANY = 0,
+    RESOURCETYPE_DISK = 1,
+    RESOURCETYPE_PRINT = 2,
+    RESOURCETYPE_UNKNOWN = 0xffffffff,
+}
+mixin(AnonymousEnum!ResourceType);
+
+enum ResourceUsage : uint
+{
+    RESOURCEUSAGE_CONNECTABLE  = 1,
+    RESOURCEUSAGE_CONTAINER = 2,
+    RESOURCEUSAGE_RESERVED = 0x80000000,
+}
+mixin(AnonymousEnum!ResourceUsage);
 
 void insufficientPermissions()
 {
@@ -251,8 +275,6 @@ void main(string[] args)
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
     uint entriesRead;
-    HANDLE wnetEnumHandle;
-
     uint totalentries;
 
     wstring serverName;
@@ -283,9 +305,8 @@ void main(string[] args)
     }
 
     auto device=(args.length>2) ? args[2].to!wstring~"\0" : "C"w;
-    immutable(wchar*) devicep = device.ptr;
     uint sharebitmap;
-    result = NetShareCheck(cast(wchar*)servernamep,cast(wchar*)devicep,&sharebitmap);
+    result = NetShareCheck(cast(wchar*)servernamep,cast(wchar*)device,&sharebitmap);
     writefln("result of share check %s, bitmap = %s",result,sharebitmap);
 
     /* related docs :
@@ -295,6 +316,7 @@ void main(string[] args)
      */
 
     SESSION_INFO_503* ptr503;
+	scope (exit) NetApiBufferFree (ptr503);
     result = NetShareEnum(cast(wchar*)servernamep,503,cast(ubyte**) &ptr503, MAX_PREFERRED_LENGTH, &entriesRead, &totalentries, null);
     writefln("result of net share enum %s; totalentries %s; entriesRead %s",result, totalentries, entriesRead);
     if (result == ERROR_ACCESS_DENIED)
@@ -306,6 +328,30 @@ void main(string[] args)
         auto share_path = cast(const)e.shi503_path[0 .. wcslen(e.shi503_path)];  
         writeln("Netname: ", share_netname, " Path: ", share_path);
     }
+	
+	writeln("let's enumerate all resources on the net");
+    HANDLE wnetEnumHandle;
+	WNetOpenEnumA(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEUSAGE_CONNECTABLE, null, &wnetEnumHandle);
+	uint count = -1;
+	uint bufferSize = 16 * 1024;
+	import core.stdc.stdlib;
+	NETRESOURCEA* resource = cast (NETRESOURCEA*)malloc(16 * 1024);
+	scope (exit) free(resource);
+	result = ERROR_ACCESS_DENIED;
+	result = WNetEnumResourceA(wnetEnumHandle, &count,  cast(void*)resource, &bufferSize);
+	if (result == ERROR_ACCESS_DENIED)
+    {
+        insufficientPermissions();
+    } else foreach(e; resource[0 .. count])
+    {
+
+        auto res_localname = e.lpLocalName ? cast(const)e.lpLocalName[0 .. strlen(e.lpLocalName)] : "";
+        auto res_remotename = e.lpRemoteName ? cast(const)e.lpRemoteName[0 .. strlen(e.lpRemoteName)] : "";
+        writeln("localName: ", res_localname, " RemoteName: ", res_remotename);
+    }
+	WNetCloseEnum(wnetEnumHandle);
+	
+/*	
     SERVER_INFO_101 *ptrServer101;
     enum  SV_TYPE_NT =0x00001000;
     enum SV_TYPE_ALL = 0xFFFFFFFF;
@@ -322,6 +368,7 @@ void main(string[] args)
         auto serverComment = cast(const)e.sv101_comment[0 .. wcslen(e.sv101_comment)];  
         writeln("name: ", serverResName, "comment: ", serverComment);
     }
+*/	
 }
 
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
