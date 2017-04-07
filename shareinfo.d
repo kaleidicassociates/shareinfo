@@ -521,8 +521,11 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
                             0,  // enumerate all resources
                             lpnr,       // null first time the function is called
                             &hEnum);    // handle to the resource
-
-    if (dwResult != ERROR_SUCCESS) {
+    if (dwResult == ERROR_EXTENDED_ERROR) {
+        printExtendedError();
+        return false;
+    }
+    else if (dwResult != ERROR_SUCCESS) {
         printf("WnetOpenEnum failed with error %d\n", dwResult);
         return false;
     }
@@ -531,7 +534,7 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
     //
     lpnrLocal = cast(LPNETRESOURCEA) malloc(cbBuffer);
     if (lpnrLocal == null) {
-        printf("WnetOpenEnumA failed with error %d\n", dwResult);
+        printf("malloc failedn", dwResult);
 //      NetErrorHandler(hwnd, dwResult, (LPSTR)"WNetOpenEnum");
         return false;
     }
@@ -576,14 +579,8 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
         }
         else if (dwResultEnum == ERROR_EXTENDED_ERROR)
         {
-            char[256] errorMessageBuffer;
-            uint extended_error_code;
-            WNetGetLastErrorA(&extended_error_code, // error code
-            CString(&errorMessageBuffer[0]),  // buffer for error description 
-            errorMessageBuffer.sizeof,  // size of error buffer
-            CString(null),     // buffer for provider name 
-            0);
-            writeln(CString(&errorMessageBuffer[0]));    
+            printExtendedError();
+            break;
         }
         else
         {
@@ -694,3 +691,19 @@ void DisplayStruct(int i, LPNETRESOURCEA lpnrLocal)
     printf("\n");
 }
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
+
+void printExtendedError()
+{
+    char[256] errorMessageBuffer;
+    char[256] providerNameBuffer;
+    uint extended_error_code;
+    writeln("Extended Error");
+
+    WNetGetLastErrorA(&extended_error_code, // error code
+        CString(&errorMessageBuffer[0]),  // buffer for error description 
+        errorMessageBuffer.sizeof,  // size of error buffer
+        CString(&providerNameBuffer[0]),     // buffer for provider name 
+        providerNameBuffer.sizeof
+    );
+    writeln(CString(&errorMessageBuffer[0]));    
+}
