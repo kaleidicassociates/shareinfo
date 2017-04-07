@@ -52,6 +52,7 @@ enum system_error_code : uint
     ERROR_INVALID_PARAMETER = 87,
     ERROR_MORE_DATA = 234,
     ERROR_NO_MORE_ITEMS = 259,
+    ERROR_NO_NETWORK = 1222,
     ERROR_NO_BROWSER_SERVERS_FOUND = 6118,
 }
 mixin(AnonymousEnum!system_error_code);
@@ -146,71 +147,71 @@ struct SERVER_INFO_101 {
 }
 
 alias net_api_bufer_free = extern (Windows) NET_API_STATUS function (
-																	 LPVOID Buffer
-																	 );
+    LPVOID Buffer
+    );
 
 alias net_file_enum = extern (Windows) NET_API_STATUS function (
-																LMSTR      servername, /// null for localhost
-																LMSTR      basepath,
-																LMSTR      username,
-																DWORD      level,
-																LPBYTE     *bufptr,
-																DWORD      prefmaxlen,
-																LPDWORD    entriesread,
-																LPDWORD    totalentries,
-																PDWORD_PTR resume_handle
-																);
+	LMSTR      servername, /// null for localhost
+	LMSTR      basepath,
+	LMSTR      username,
+	DWORD      level,
+	LPBYTE     *bufptr,
+	DWORD      prefmaxlen,
+	LPDWORD    entriesread,
+	LPDWORD    totalentries,
+	PDWORD_PTR resume_handle
+	);
 
 alias net_session_enum = extern (Windows) NET_API_STATUS function (
-																   LPWSTR  servername,
-																   LPWSTR  UncClientName,
-																   LPWSTR  username,
-																   DWORD   level,
-																   LPBYTE  *bufptr,
-																   DWORD   prefmaxlen,
-																   LPDWORD entriesread,
-																   LPDWORD totalentries,
-																   LPDWORD resume_handle
-																   );
+    LPWSTR  servername,
+    LPWSTR  UncClientName,
+    LPWSTR  username,
+    DWORD   level,
+    LPBYTE  *bufptr,
+    DWORD   prefmaxlen,
+    LPDWORD entriesread,
+    LPDWORD totalentries,
+    LPDWORD resume_handle
+    );
 
 alias net_share_check = extern(Windows) NET_API_STATUS function (
-																 LPWSTR  servername,
-																 LPWSTR  device,
-																 LPDWORD type
-																 );
+	 LPWSTR  servername,
+	 LPWSTR  device,
+	 LPDWORD type
+	 );
 
 alias net_share_enum = extern(Windows) NET_API_STATUS function (
-																LPWSTR  servername,
-																DWORD   level,
-																LPBYTE  *bufptr,
-																DWORD   prefmaxlen,
-																LPDWORD entriesread,
-																LPDWORD totalentries,
-																LPDWORD resume_handle
-																);
+	LPWSTR  servername,
+	DWORD   level,
+	LPBYTE  *bufptr,
+	DWORD   prefmaxlen,
+	LPDWORD entriesread,
+	LPDWORD totalentries,
+	LPDWORD resume_handle
+	);
 
 
 alias net_use_enum = extern (Windows) NET_API_STATUS function (
-															   LMSTR   UncServerName,
-															   DWORD   Level,
-															   LPBYTE  *BufPtr,
-															   DWORD   PreferedMaximumSize,
-															   LPDWORD EntriesRead,
-															   LPDWORD TotalEntries,
-															   LPDWORD ResumeHandle
-															   );
+   LMSTR   UncServerName,
+   DWORD   Level,
+   LPBYTE  *BufPtr,
+   DWORD   PreferedMaximumSize,
+   LPDWORD EntriesRead,
+   LPDWORD TotalEntries,
+   LPDWORD ResumeHandle
+   );
 
 alias net_server_enum = extern(Windows) NET_API_STATUS function (
-																 LPWSTR servername, // really LPCWSTR
-																 DWORD   level,
-																 LPBYTE  *bufptr,
-																 DWORD   prefmaxlen,
-																 LPDWORD entriesread,
-																 LPDWORD totalentries,
-																 DWORD   servertype,
-																 LPWSTR domain,   // really LPCWSTR
-																 LPDWORD resume_handle
-																 );
+	 LPWSTR servername, // really LPCWSTR
+	 DWORD   level,
+	 LPBYTE  *bufptr,
+	 DWORD   prefmaxlen,
+	 LPDWORD entriesread,
+	 LPDWORD totalentries,
+	 DWORD   servertype,
+	 LPWSTR domain,   // really LPCWSTR
+	 LPDWORD resume_handle
+	 );
 
 // ---------------------wnet functions---------------------------------
 extern (Windows) struct NETRESOURCEA {
@@ -226,23 +227,23 @@ extern (Windows) struct NETRESOURCEA {
 }
 
 alias wnet_open_enum_a = extern(Windows) system_error_code function (
-																	 DWORD         dwScope,
-																	 DWORD         dwType,
-																	 DWORD         dwUsage,
-																	 NETRESOURCEA  *lpNetResource,
-																	 LPHANDLE      lphEnum // out
-																	 );
+    DWORD         dwScope,
+    DWORD         dwType,
+    DWORD         dwUsage,
+    NETRESOURCEA  *lpNetResource,
+    LPHANDLE      lphEnum // out
+    );
 
 alias wnet_enum_resource_a = extern (Windows) system_error_code function (
-																		  HANDLE  hEnum,
-																		  LPDWORD lpcCount, //inout
-																		  LPVOID  lpBuffer, //out
-																		  LPDWORD lpBufferSize //inout
-																		  );
+    HANDLE  hEnum,
+    LPDWORD lpcCount, //inout
+    LPVOID  lpBuffer, //out
+    LPDWORD lpBufferSize //inout
+    );
 
 alias wnet_close_enum = extern (Windows) system_error_code function (
-																	 HANDLE hEnum
-																	 );
+    HANDLE hEnum
+    );
 
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
@@ -620,10 +621,10 @@ void DisplayStruct(int i, LPNETRESOURCEA lpnrLocal)
         printf("container ");
     printf("\n");
 
-    printf("NETRESOURCE[%d] Localname: %S\n", i, lpnrLocal.lpLocalName);
-    printf("NETRESOURCE[%d] Remotename: %S\n", i, lpnrLocal.lpRemoteName);
-    printf("NETRESOURCE[%d] Comment: %S\n", i, lpnrLocal.lpComment);
-    printf("NETRESOURCE[%d] Provider: %S\n", i, lpnrLocal.lpProvider);
+    printf("NETRESOURCE[%d] Localname: %s\n", i, lpnrLocal.lpLocalName);
+    printf("NETRESOURCE[%d] Remotename: %s\n", i, lpnrLocal.lpRemoteName);
+    printf("NETRESOURCE[%d] Comment: %s\n", i, lpnrLocal.lpComment);
+    printf("NETRESOURCE[%d] Provider: %s\n", i, lpnrLocal.lpProvider);
     printf("\n");
 }
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
