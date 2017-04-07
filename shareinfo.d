@@ -358,14 +358,15 @@ void main(string[] args)
 			import core.stdc.stdlib;
 			NETRESOURCEA* resource2 = cast (NETRESOURCEA*)malloc(16 * 1024);
 			scope (exit) free(resource2);
-			foreach(i2; 0 .. count2)
+			result = WNetEnumResourceA(wnetEnumHandle2, &count2,  cast(void*)resource2, &bufferSize2);
+			if (result == ERROR_SUCCESS && count2 != -1) foreach(i2; 0 .. count2)
 			{
 				auto e2 = resource2[i2];
 				auto res_localname2 = e2.lpLocalName ? cast(const)e2.lpLocalName[0 .. strlen(e2.lpLocalName)] : "";
 				auto res_remotename2 = e2.lpRemoteName ? cast(const)e2.lpRemoteName[0 .. strlen(e2.lpRemoteName)] : "";
                 writeln("\tlocalName: ", res_localname2, " RemoteName: ", res_remotename2);
 			}
-			result = WNetEnumResourceA(wnetEnumHandle2, &count2,  cast(void*)resource2, &bufferSize2);
+			
 		}
     }
 	WNetCloseEnum(wnetEnumHandle);
