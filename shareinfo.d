@@ -57,7 +57,7 @@ enum system_error_code : uint
 }
 mixin(AnonymousEnum!system_error_code);
 
-enum resource_display_type
+enum resource_display_type : uint
 {
     RESOURCEDISPLAYTYPE_GENERIC = 0,
     RESOURCEDISPLAYTYPE_DOMAIN = 1,
@@ -148,19 +148,19 @@ struct SERVER_INFO_101 {
 
 alias net_api_bufer_free = extern (Windows) NET_API_STATUS function (
     LPVOID Buffer
-    );
+);
 
 alias net_file_enum = extern (Windows) NET_API_STATUS function (
-	LMSTR      servername, /// null for localhost
-	LMSTR      basepath,
-	LMSTR      username,
-	DWORD      level,
-	LPBYTE     *bufptr,
-	DWORD      prefmaxlen,
-	LPDWORD    entriesread,
-	LPDWORD    totalentries,
-	PDWORD_PTR resume_handle
-	);
+    LMSTR      servername, /// null for localhost
+    LMSTR      basepath,
+    LMSTR      username,
+    DWORD      level,
+    LPBYTE     *bufptr,    
+    DWORD      prefmaxlen,
+    LPDWORD    entriesread,
+    LPDWORD    totalentries,
+    PDWORD_PTR resume_handle
+);
 
 alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPWSTR  servername,
@@ -172,23 +172,23 @@ alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPDWORD entriesread,
     LPDWORD totalentries,
     LPDWORD resume_handle
-    );
+);
 
 alias net_share_check = extern(Windows) NET_API_STATUS function (
-	 LPWSTR  servername,
-	 LPWSTR  device,
-	 LPDWORD type
-	 );
+    LPWSTR  servername,
+    LPWSTR  device,
+    LPDWORD type
+);
 
 alias net_share_enum = extern(Windows) NET_API_STATUS function (
-	LPWSTR  servername,
-	DWORD   level,
-	LPBYTE  *bufptr,
-	DWORD   prefmaxlen,
-	LPDWORD entriesread,
-	LPDWORD totalentries,
-	LPDWORD resume_handle
-	);
+    LPWSTR  servername,
+    DWORD   level,
+    LPBYTE  *bufptr,
+    DWORD   prefmaxlen,
+    LPDWORD entriesread,
+    LPDWORD totalentries,
+    LPDWORD resume_handle
+);
 
 
 alias net_use_enum = extern (Windows) NET_API_STATUS function (
@@ -213,17 +213,46 @@ alias net_server_enum = extern(Windows) NET_API_STATUS function (
 	 LPDWORD resume_handle
 	 );
 
+struct CString
+{
+    char* ptr;
+    alias ptr this;
+
+    const(char[]) toString() pure const
+    {
+        if (!ptr) return "";
+        return cast(const)ptr[0 .. strlen(ptr)];
+    }
+}
+
 // ---------------------wnet functions---------------------------------
 extern (Windows) struct NETRESOURCEA {
-	DWORD  dwScope;
-	DWORD  dwType;
-	DWORD  dwDisplayType;
-	DWORD  dwUsage;
-	alias LPTSTR = char*;
-	LPTSTR lpLocalName;
-	LPTSTR lpRemoteName;
-	LPTSTR lpComment;
-	LPTSTR lpProvider;
+    resource_scope  dwScope;
+    resource_type  dwType;
+    resource_display_type  dwDisplayType;
+    resource_usage dwUsage;
+    alias LPTSTR = CString;
+    LPTSTR lpLocalName;
+    LPTSTR lpRemoteName;
+    LPTSTR lpComment;
+    LPTSTR lpProvider;
+
+    string toString() pure const
+    {
+       string result;
+
+       result ~= "dwScope: " ~ to!string(dwScope) ~ "\n";
+       result ~= "dwType: " ~ to!string(dwType) ~ "\n";
+       result ~= "dwDisplayType: " ~ to!string(dwDisplayType) ~ "\n";
+       result ~= "dwUsage: " ~ to!string(dwUsage) ~ "\n";
+
+       result ~= "lpLocalName: " ~ lpLocalName.toString ~ "\n";
+       result ~= "lpRemoteName: " ~ lpRemoteName.toString ~ "\n";
+       result ~= "lpComment: " ~ lpComment.toString ~ "\n";
+       result ~= "lpProvider: " ~ lpProvider.toString ~ "\n";
+
+       return result;
+    }
 }
 
 alias wnet_open_enum_a = extern(Windows) system_error_code function (
@@ -232,48 +261,48 @@ alias wnet_open_enum_a = extern(Windows) system_error_code function (
     DWORD         dwUsage,
     NETRESOURCEA  *lpNetResource,
     LPHANDLE      lphEnum // out
-    );
+);
 
 alias wnet_enum_resource_a = extern (Windows) system_error_code function (
     HANDLE  hEnum,
     LPDWORD lpcCount, //inout
     LPVOID  lpBuffer, //out
     LPDWORD lpBufferSize //inout
-    );
+);
 
 alias wnet_close_enum = extern (Windows) system_error_code function (
     HANDLE hEnum
-    );
+);
 
 extern (Windows) void* LoadLibraryA(const char* libname);
 extern (Windows) void* GetProcAddress(void* moduleHandle, const char* procname);
 
-enum Resource : uint
+enum resource_scope : uint
 {
     RESOURCE_CONNECTED = 1,
     RESOURCE_GLOBALNET = 2,
     RESOURCE_REMEMBERED = 3,
     RESOURCE_ENUM_ALL = ushort.max, // not sure about this one 
 }
-mixin(AnonymousEnum!Resource);
+mixin(AnonymousEnum!resource_scope);
 
-enum ResourceType : uint
+enum resource_type : uint
 {
     RESOURCETYPE_ANY = 0,
     RESOURCETYPE_DISK = 1,
     RESOURCETYPE_PRINT = 2,
     RESOURCETYPE_UNKNOWN = 0xffffffff,
 }
-mixin(AnonymousEnum!ResourceType);
+mixin(AnonymousEnum!resource_type);
 
-enum ResourceUsage : uint
+enum resource_usage : uint
 {
     RESOURCEUSAGE_ALL = 0,
     RESOURCEUSAGE_CONNECTABLE  = 1,
     RESOURCEUSAGE_CONTAINER = 2,
     RESOURCEUSAGE_RESERVED = 0x80000000,
 }
-mixin(AnonymousEnum!ResourceUsage);
+mixin(AnonymousEnum!resource_usage);
 
 void insufficientPermissions()
 {
