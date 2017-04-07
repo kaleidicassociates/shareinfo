@@ -52,6 +52,7 @@ enum system_error_code : uint
     ERROR_INVALID_PARAMETER = 87,
     ERROR_MORE_DATA = 234,
     ERROR_NO_MORE_ITEMS = 259,
+    ERROR_EXTENDED_ERROR = 1208,
     ERROR_NO_NETWORK = 1222,
     ERROR_NO_BROWSER_SERVERS_FOUND = 6118,
 }
@@ -255,6 +256,23 @@ extern (Windows) struct NETRESOURCEA {
     }
 }
 
+template wnet_get_last_error(bool a)
+{
+static if (a)
+    alias LPTSTR = CString;
+else 
+    static assert(0);
+
+alias wnet_get_last_error = extern(Windows) system_error_code function (
+  LPDWORD lpError,
+  LPTSTR  lpErrorBuf,
+  DWORD   nErrorBufSize,
+  LPTSTR  lpNameBuf,
+  DWORD   nNameBufSize
+);
+}
+alias wnet_get_last_error_a = wnet_get_last_error!true;
+
 alias wnet_open_enum_a = extern(Windows) system_error_code function (
     DWORD         dwScope,
     DWORD         dwType,
@@ -317,6 +335,7 @@ net_share_enum NetShareEnum;
 net_server_enum NetServerEnum;
 net_use_enum NetUseEnum;
 
+wnet_get_last_error_a WNetGetLastErrorA;
 wnet_open_enum_a WNetOpenEnumA;
 wnet_enum_resource_a WNetEnumResourceA;
 wnet_close_enum WNetCloseEnum;
@@ -333,7 +352,8 @@ shared static this()
     NetShareEnum = cast(net_share_enum) GetProcAddress(netapi32_handle, "NetShareEnum");
     NetServerEnum = cast(net_server_enum) GetProcAddress(netapi32_handle, "NetServerEnum");
     NetUseEnum = cast(net_use_enum) GetProcAddress(netapi32_handle, "NetUseEnum");
-    
+
+    WNetGetLastErrorA = cast (wnet_get_last_error_a) GetProcAddress(mpr_handle, "WNetGetLastErrorA");
     WNetOpenEnumA = cast(wnet_open_enum_a) GetProcAddress(mpr_handle, "WNetOpenEnumA");
     WNetEnumResourceA = cast(wnet_enum_resource_a) GetProcAddress(mpr_handle, "WNetEnumResourceA");
     WNetCloseEnum = cast (wnet_close_enum) GetProcAddress(mpr_handle, "WNetCloseEnum");
@@ -550,11 +570,28 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
         }
         // Process errors.
         //
-        else if (dwResultEnum != ERROR_NO_MORE_ITEMS) {
-            printf("WNetEnumResource failed with error %d\n", dwResultEnum);
+        else if (dwResultEnum == ERROR_NO_MORE_ITEMS) 
+        {
+           // do nothing this is alright
+        }
+        else if (dwResultEnum == ERROR_EXTENDED_ERROR)
+        {
+            char[256] errorMessageBuffer;
+            uint extended_error_code;
+            WNetGetLastErrorA(&extended_error_code, // error code
+            CString(&errorMessageBuffer[0]),  // buffer for error description 
+            errorMessageBuffer.sizeof,  // size of error buffer
+            CString(null),     // buffer for provider name 
+            0);
+            writeln(CString(&errorMessageBuffer[0]));    
+        }
+        else
+        {
+                   printf("WNetEnumResource failed with error %d\n", dwResultEnum);
 //      NetErrorHandler(hwnd, dwResultEnum, (LPSTR)"WNetEnumResource");
             break;
         }
+
     }
     //
     // End do.
