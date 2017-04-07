@@ -1,7 +1,10 @@
-import std.stdio : writeln, writefln;
+import std.stdio : writeln, writefln, printf;
 import std.conv;
 import core.stdc.string : strlen;
 import core.stdc.wchar_ : wcslen;
+import core.stdc.stdlib : malloc, free;
+import core.stdc.string : memset;
+
 //import core.sys.windows.lmshare;
 
 enum AnonymousEnum(EnumType, string fqnEnumType = EnumType.stringof) = (){
@@ -45,10 +48,30 @@ enum system_error_code : uint
     ERROR_ACCESS_DENIED = 5,
     ERROR_NOT_ENOUGH_MEMORY = 8,
     ERROR_BAD_NETPATH = 53,
+    ERROR_NETWORK_ACCESS_DENIED = 65,
+    ERROR_INVALID_PARAMETER = 87,
     ERROR_MORE_DATA = 234,
+    ERROR_NO_MORE_ITEMS = 259,
     ERROR_NO_BROWSER_SERVERS_FOUND = 6118,
 }
 mixin(AnonymousEnum!system_error_code);
+
+enum resource_display_type
+{
+    RESOURCEDISPLAYTYPE_GENERIC = 0,
+    RESOURCEDISPLAYTYPE_DOMAIN = 1,
+    RESOURCEDISPLAYTYPE_SERVER = 2,
+    RESOURCEDISPLAYTYPE_SHARE = 3,
+    RESOURCEDISPLAYTYPE_FILE = 4,
+    RESOURCEDISPLAYTYPE_GROUP = 5,
+    RESOURCEDISPLAYTYPE_NETWORK = 6,
+    RESOURCEDISPLAYTYPE_ROOT = 7,
+    RESOURCEDISPLAYTYPE_SHAREADMIN = 8,
+    // extended ?
+    RESOURCEDISPLAYTYPE_TREE = 9,
+    RESOURCEDISPLAYTYPE_NDSCONTAINER = 10,
+}
+mixin(AnonymousEnum!resource_display_type);
 
 version (Unicode)
 {
@@ -229,6 +252,7 @@ enum Resource : uint
     RESOURCE_CONNECTED = 1,
     RESOURCE_GLOBALNET = 2,
     RESOURCE_REMEMBERED = 3,
+    RESOURCE_ENUM_ALL = ushort.max, // not sure about this one 
 }
 mixin(AnonymousEnum!Resource);
 
@@ -243,6 +267,7 @@ mixin(AnonymousEnum!ResourceType);
 
 enum ResourceUsage : uint
 {
+    RESOURCEUSAGE_ALL = 0,
     RESOURCEUSAGE_CONNECTABLE  = 1,
     RESOURCEUSAGE_CONTAINER = 2,
     RESOURCEUSAGE_RESERVED = 0x80000000,
@@ -253,24 +278,40 @@ void insufficientPermissions()
 {
     writeln("You should run this program with a more privileged user-level ... yours is insufficient");
 }
+immutable {
+net_file_enum NetFileEnum;
+net_session_enum NetSessionEnum;
+net_api_bufer_free NetApiBufferFree;
+net_share_check NetShareCheck;
+net_share_enum NetShareEnum;
+net_server_enum NetServerEnum;
+net_use_enum NetUseEnum;
+
+wnet_open_enum_a WNetOpenEnumA;
+wnet_enum_resource_a WNetEnumResourceA;
+wnet_close_enum WNetCloseEnum;
+}
+shared static this()
+{
+    auto netapi32_handle = LoadLibraryA("Netapi32.dll");
+    auto mpr_handle = LoadLibraryA("Mpr.dll");
+
+    NetFileEnum = cast(net_file_enum) GetProcAddress(netapi32_handle, "NetFileEnum");
+    NetSessionEnum = cast(net_session_enum) GetProcAddress(netapi32_handle, "NetSessionEnum");
+    NetApiBufferFree = cast(net_api_bufer_free) GetProcAddress(netapi32_handle, "NetApiBufferFree");
+    NetShareCheck = cast(net_share_check) GetProcAddress(netapi32_handle, "NetShareCheck");
+    NetShareEnum = cast(net_share_enum) GetProcAddress(netapi32_handle, "NetShareEnum");
+    NetServerEnum = cast(net_server_enum) GetProcAddress(netapi32_handle, "NetServerEnum");
+    NetUseEnum = cast(net_use_enum) GetProcAddress(netapi32_handle, "NetUseEnum");
+    
+    WNetOpenEnumA = cast(wnet_open_enum_a) GetProcAddress(mpr_handle, "WNetOpenEnumA");
+    WNetEnumResourceA = cast(wnet_enum_resource_a) GetProcAddress(mpr_handle, "WNetEnumResourceA");
+    WNetCloseEnum = cast (wnet_close_enum) GetProcAddress(mpr_handle, "WNetCloseEnum");
+}
 
 void main(string[] args)
 {   
-    auto netapi32_handle = LoadLibraryA("Netapi32.dll");
-    auto mpr_handle = LoadLibraryA("Mpr.dll");
     //TODO move those functions with their typedefs into a seperate file and initialize the pointers in a shared module constructor
-
-    auto NetFileEnum = cast(net_file_enum) GetProcAddress(netapi32_handle, "NetFileEnum");
-    auto NetSessionEnum = cast(net_session_enum) GetProcAddress(netapi32_handle, "NetSessionEnum");
-    auto NetApiBufferFree = cast(net_api_bufer_free) GetProcAddress(netapi32_handle, "NetApiBufferFree");
-    auto NetShareCheck = cast(net_share_check) GetProcAddress(netapi32_handle, "NetShareCheck");
-    auto NetShareEnum = cast(net_share_enum) GetProcAddress(netapi32_handle, "NetShareEnum");
-    auto NetServerEnum = cast(net_server_enum) GetProcAddress(netapi32_handle, "NetServerEnum");
-    auto NetUseEnum = cast(net_use_enum) GetProcAddress(netapi32_handle, "NetUseEnum");
-
-    auto WNetOpenEnumA = cast(wnet_open_enum_a) GetProcAddress(mpr_handle, "WNetOpenEnumA");
-    auto WNetEnumResourceA = cast(wnet_enum_resource_a) GetProcAddress(mpr_handle, "WNetEnumResourceA");
-    auto WNetCloseEnum = cast (wnet_close_enum) GetProcAddress(mpr_handle, "WNetCloseEnum");
 
     //FILE_INFO_3* bufptr;
     SESSION_INFO_10* bufptr;
@@ -330,7 +371,8 @@ void main(string[] args)
     }
 
 	writeln("let's enumerate all resources on the net");
-    HANDLE wnetEnumHandle;
+        kick_off();
+/*        HANDLE wnetEnumHandle;
 	WNetOpenEnumA(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEUSAGE_CONNECTABLE, null, &wnetEnumHandle);
 	uint count = -1;
 	uint bufferSize = 16 * 1024;
@@ -347,6 +389,11 @@ void main(string[] args)
         auto e = resource[i];
         auto res_localname = e.lpLocalName ? cast(const)e.lpLocalName[0 .. strlen(e.lpLocalName)] : "";
         auto res_remotename = e.lpRemoteName ? cast(const)e.lpRemoteName[0 .. strlen(e.lpRemoteName)] : "";
+        if (e.dwUsage & RESOURCEUSAGE_CONTAINER)
+        {
+            iterate_resources(&e);
+        }
+
         writeln("localName: ", res_localname, " RemoteName: ", res_remotename);
 		if (res_remotename == "Microsoft Windows Network")
 		{
@@ -370,8 +417,8 @@ void main(string[] args)
 		}
     }
 	WNetCloseEnum(wnetEnumHandle);
-
-	/*	
+*/	
+/*	
     SERVER_INFO_101 *ptrServer101;
     enum  SV_TYPE_NT =0x00001000;
     enum SV_TYPE_ALL = 0xFFFFFFFF;
@@ -391,4 +438,192 @@ void main(string[] args)
 	*/	
 }
 
+/**
+ below code is taken directly from https://msdn.microsoft.com/en-us/library/windows/desktop/aa385341(v=vs.85).aspx
+*/
+
+int kick_off()
+{
+
+    LPNETRESOURCEA lpnr = null;
+
+    if (EnumerateFunc(lpnr) == false) {
+        printf("Call to EnumerateFunc failed\n");
+        return 1;
+    } else
+        return 0;
+
+}
+
+bool EnumerateFunc(LPNETRESOURCEA lpnr)
+{
+    DWORD dwResult, dwResultEnum;
+    HANDLE hEnum;
+    DWORD cbBuffer = 16384;     // 16K is a good size
+    DWORD cEntries = -1;        // enumerate all possible entries
+    LPNETRESOURCEA lpnrLocal;    // pointer to enumerated structures
+    DWORD i;
+    //
+    // Call the WNetOpenEnum function to begin the enumeration.
+    //
+    dwResult = WNetOpenEnumA(RESOURCE_GLOBALNET, // all network resources
+                            RESOURCETYPE_ANY,   // all resources
+                            0,  // enumerate all resources
+                            lpnr,       // null first time the function is called
+                            &hEnum);    // handle to the resource
+
+    if (dwResult != ERROR_SUCCESS) {
+        printf("WnetOpenEnum failed with error %d\n", dwResult);
+        return false;
+    }
+    //
+    // Call the GlobalAlloc function to allocate resources.
+    //
+    lpnrLocal = cast(LPNETRESOURCEA) malloc(cbBuffer);
+    if (lpnrLocal == null) {
+        printf("WnetOpenEnumA failed with error %d\n", dwResult);
+//      NetErrorHandler(hwnd, dwResult, (LPSTR)"WNetOpenEnum");
+        return false;
+    }
+
+    do {
+        //
+        // Initialize the buffer.
+        //
+        memset(lpnrLocal, 0, cbBuffer);
+        //
+        // Call the WNetEnumResource function to continue
+        //  the enumeration.
+        //
+        dwResultEnum = WNetEnumResourceA(hEnum,  // resource handle
+                                        &cEntries,      // defined locally as -1
+                                        lpnrLocal,      // LPNETRESOURCE
+                                        &cbBuffer);     // buffer size
+        //
+        // If the call succeeds, loop through the structures.
+        //
+        if (dwResultEnum == ERROR_SUCCESS) {
+            for (i = 0; i < cEntries; i++) {
+                // Call an application-defined function to
+                //  display the contents of the NETRESOURCE structures.
+                //
+                DisplayStruct(i, &lpnrLocal[i]);
+
+                // If the NETRESOURCE structure represents a container resource, 
+                //  call the EnumerateFunc function recursively.
+
+                if (RESOURCEUSAGE_CONTAINER == (lpnrLocal[i].dwUsage
+                                                & RESOURCEUSAGE_CONTAINER))
+                    if (!EnumerateFunc(&lpnrLocal[i]))
+                        printf("EnumerateFunc returned false\n");
+            }
+        }
+        // Process errors.
+        //
+        else if (dwResultEnum != ERROR_NO_MORE_ITEMS) {
+            printf("WNetEnumResource failed with error %d\n", dwResultEnum);
+//      NetErrorHandler(hwnd, dwResultEnum, (LPSTR)"WNetEnumResource");
+            break;
+        }
+    }
+    //
+    // End do.
+    //
+    while (dwResultEnum != ERROR_NO_MORE_ITEMS);
+    //
+    // Call the GlobalFree function to free the memory.
+    //
+    free(lpnrLocal);
+    //
+    // Call WNetCloseEnum to end the enumeration.
+    //
+    dwResult = WNetCloseEnum(hEnum);
+
+    if (dwResult != ERROR_SUCCESS) {
+        //
+        // Process errors.
+        //
+        printf("WNetCloseEnum failed with error %d\n", dwResult);
+//    NetErrorHandler(hwnd, dwResult, (LPSTR)"WNetCloseEnum");
+        return false;
+    }
+
+    return true;
+}
+
+void DisplayStruct(int i, LPNETRESOURCEA lpnrLocal)
+{
+    printf("NETRESOURCE[%d] Scope: ", i);
+    switch (lpnrLocal.dwScope) {
+    case (RESOURCE_CONNECTED):
+        printf("connected\n");
+        break;
+    case (RESOURCE_GLOBALNET):
+        printf("all resources\n");
+        break;
+    case (RESOURCE_REMEMBERED):
+        printf("remembered\n");
+        break;
+    default:
+        printf("unknown scope %d\n", lpnrLocal.dwScope);
+        break;
+    }
+
+    printf("NETRESOURCE[%d] Type: ", i);
+    switch (lpnrLocal.dwType) {
+    case (RESOURCETYPE_ANY):
+        printf("any\n");
+        break;
+    case (RESOURCETYPE_DISK):
+        printf("disk\n");
+        break;
+    case (RESOURCETYPE_PRINT):
+        printf("print\n");
+        break;
+    default:
+        printf("unknown type %d\n", lpnrLocal.dwType);
+        break;
+    }
+
+    printf("NETRESOURCE[%d] DisplayType: ", i);
+    switch (lpnrLocal.dwDisplayType) {
+    case (RESOURCEDISPLAYTYPE_GENERIC):
+        printf("generic\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_DOMAIN):
+        printf("domain\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_SERVER):
+        printf("server\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_SHARE):
+        printf("share\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_FILE):
+        printf("file\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_GROUP):
+        printf("group\n");
+        break;
+    case (RESOURCEDISPLAYTYPE_NETWORK):
+        printf("network\n");
+        break;
+    default:
+        printf("unknown display type %d\n", lpnrLocal.dwDisplayType);
+        break;
+    }
+
+    printf("NETRESOURCE[%d] Usage: 0x%x = ", i, lpnrLocal.dwUsage);
+    if (lpnrLocal.dwUsage & RESOURCEUSAGE_CONNECTABLE)
+        printf("connectable ");
+    if (lpnrLocal.dwUsage & RESOURCEUSAGE_CONTAINER)
+        printf("container ");
+    printf("\n");
+
+    printf("NETRESOURCE[%d] Localname: %S\n", i, lpnrLocal.lpLocalName);
+    printf("NETRESOURCE[%d] Remotename: %S\n", i, lpnrLocal.lpRemoteName);
+    printf("NETRESOURCE[%d] Comment: %S\n", i, lpnrLocal.lpComment);
+    printf("NETRESOURCE[%d] Provider: %S\n", i, lpnrLocal.lpProvider);
+    printf("\n");
+}
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
