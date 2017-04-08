@@ -22,8 +22,7 @@ version = Unicode;
 alias DWORD = uint;
 alias LPDWORD = uint*;
 alias LPBYTE = ubyte*;
-alias PDWORD_PTR = size_t*;
-alias NET_API_STATUS = uint;
+alias PDWORD_PTR = size_t*; // seems to like this should be uint* ?
 alias LPWSTR = wchar*;
 alias LPVOID = void*;
 alias HANDLE = void*; // not sure about this one
@@ -126,16 +125,16 @@ extern(Windows) struct SESSION_INFO_503 {
 }
 
 extern (Windows) struct SHARE_INFO_502 {
-	LPWSTR               shi502_netname;
-	DWORD                shi502_type;
-	LPWSTR               shi502_remark;
-	DWORD                shi502_permissions;
-	DWORD                shi502_max_uses;
-	DWORD                shi502_current_uses;
-	LPWSTR               shi502_path;
-	LPWSTR               shi502_passwd;
-	DWORD                shi502_reserved;
-	PSECURITY_DESCRIPTOR shi502_security_descriptor;
+    LPWSTR               shi502_netname;
+    DWORD                shi502_type;
+    LPWSTR               shi502_remark;
+    DWORD                shi502_permissions;
+    DWORD                shi502_max_uses;
+    DWORD                shi502_current_uses;
+    LPWSTR               shi502_path;
+    LPWSTR               shi502_passwd;
+    DWORD                shi502_reserved;
+    PSECURITY_DESCRIPTOR shi502_security_descriptor;
 }
 
 struct SERVER_INFO_101 {
@@ -147,11 +146,11 @@ struct SERVER_INFO_101 {
     LPWSTR sv101_comment;
 }
 
-alias net_api_bufer_free = extern (Windows) NET_API_STATUS function (
+alias net_api_bufer_free = extern (Windows) system_error_code function (
     LPVOID Buffer
 );
 
-alias net_file_enum = extern (Windows) NET_API_STATUS function (
+alias net_file_enum = extern (Windows) system_error_code function (
     LMSTR      servername, /// null for localhost
     LMSTR      basepath,
     LMSTR      username,
@@ -163,7 +162,7 @@ alias net_file_enum = extern (Windows) NET_API_STATUS function (
     PDWORD_PTR resume_handle
 );
 
-alias net_session_enum = extern (Windows) NET_API_STATUS function (
+alias net_session_enum = extern (Windows) system_error_code function (
     LPWSTR  servername,
     LPWSTR  UncClientName,
     LPWSTR  username,
@@ -175,13 +174,13 @@ alias net_session_enum = extern (Windows) NET_API_STATUS function (
     LPDWORD resume_handle
 );
 
-alias net_share_check = extern(Windows) NET_API_STATUS function (
+alias net_share_check = extern(Windows) system_error_code function (
     LPWSTR  servername,
     LPWSTR  device,
     LPDWORD type
 );
 
-alias net_share_enum = extern(Windows) NET_API_STATUS function (
+alias net_share_enum = extern(Windows) system_error_code function (
     LPWSTR  servername,
     DWORD   level,
     LPBYTE  *bufptr,
@@ -192,27 +191,27 @@ alias net_share_enum = extern(Windows) NET_API_STATUS function (
 );
 
 
-alias net_use_enum = extern (Windows) NET_API_STATUS function (
-   LMSTR   UncServerName,
-   DWORD   Level,
-   LPBYTE  *BufPtr,
-   DWORD   PreferedMaximumSize,
-   LPDWORD EntriesRead,
-   LPDWORD TotalEntries,
-   LPDWORD ResumeHandle
-   );
+alias net_use_enum = extern (Windows) system_error_code function (
+    LMSTR   UncServerName,
+    DWORD   Level,
+    LPBYTE  *BufPtr,
+    DWORD   PreferedMaximumSize,
+    LPDWORD EntriesRead,
+    LPDWORD TotalEntries,
+    LPDWORD ResumeHandle
+);
 
-alias net_server_enum = extern(Windows) NET_API_STATUS function (
-	 LPWSTR servername, // really LPCWSTR
-	 DWORD   level,
-	 LPBYTE  *bufptr,
-	 DWORD   prefmaxlen,
-	 LPDWORD entriesread,
-	 LPDWORD totalentries,
-	 DWORD   servertype,
-	 LPWSTR domain,   // really LPCWSTR
-	 LPDWORD resume_handle
-	 );
+alias net_server_enum = extern(Windows) system_error_code function (
+    LPWSTR servername, // really LPCWSTR
+    DWORD   level,
+    LPBYTE  *bufptr,
+    DWORD   prefmaxlen,
+    LPDWORD entriesread,
+    LPDWORD totalentries,
+    DWORD   servertype,
+    LPWSTR domain,   // really LPCWSTR
+    LPDWORD resume_handle
+);
 
 struct CString
 {
@@ -256,19 +255,19 @@ extern (Windows) struct NETRESOURCEA {
     }
 }
 
-template wnet_get_last_error(bool a)
+template wnet_get_last_error(bool isAscii)
 {
-static if (a)
+static if (isAscii)
     alias LPTSTR = CString;
 else 
-    static assert(0);
+    static assert(0, "wget_get_last_error_w is not supported for now");
 
 alias wnet_get_last_error = extern(Windows) system_error_code function (
-  LPDWORD lpError,
-  LPTSTR  lpErrorBuf,
-  DWORD   nErrorBufSize,
-  LPTSTR  lpNameBuf,
-  DWORD   nNameBufSize
+    LPDWORD lpError,
+    LPTSTR  lpErrorBuf,
+    DWORD   nErrorBufSize,
+    LPTSTR  lpNameBuf,
+    DWORD   nNameBufSize
 );
 }
 alias wnet_get_last_error_a = wnet_get_last_error!true;
@@ -326,6 +325,7 @@ void insufficientPermissions()
 {
     writeln("You should run this program with a more privileged user-level ... yours is insufficient");
 }
+
 immutable {
 net_file_enum NetFileEnum;
 net_session_enum NetSessionEnum;
@@ -340,6 +340,7 @@ wnet_open_enum_a WNetOpenEnumA;
 wnet_enum_resource_a WNetEnumResourceA;
 wnet_close_enum WNetCloseEnum;
 }
+
 shared static this()
 {
     auto netapi32_handle = LoadLibraryA("Netapi32.dll");
