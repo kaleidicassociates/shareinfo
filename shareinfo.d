@@ -489,24 +489,56 @@ void main(string[] args)
 	*/	
 }
 
-/**
+struct ResourceInfo {
+    NETRESOURCEA resource;
+    NETRESOURCEA _parent;
+}
+
+struct owned_netresource
+{
+    resource_scope  dwScope;
+    resource_type  dwType;
+    resource_display_type  dwDisplayType;
+    resource_usage dwUsage;
+
+    string localName;
+    string remoteName;
+    string comment;
+    string provider;
+
+    this(NETRESOURCEA that)
+    {
+        dwScope = that.dwScope;
+        dwType = that.dwType;
+        dwDisplayType= that.dwDisplayType;
+        dwUsage = that.dwUsage;
+
+        localName = that.lpLocalName[0 .. strlen(that.lpLocalName)].idup;
+        remoteName = that.lpRemoteName[0 .. strlen(that.lpRemoteName)].idup;
+        comment = that.lpComment[0 .. strlen(that.lpComment)].idup;
+        provider = that.lpProvider[0 .. strlen(that.lpProvider)].idup;
+    }
+}
+
+/*
  below code is taken directly from https://msdn.microsoft.com/en-us/library/windows/desktop/aa385341(v=vs.85).aspx
+ though heavily modified.
 */
 
-int kick_off()
+owned_netresource[] kick_off()
 {
+    owned_netresource[] result = [];
 
     LPNETRESOURCEA lpnr = null;
 
-    if (EnumerateFunc(lpnr) == false) {
+    if (EnumerateFunc(lpnr, &result) == false) {
         printf("Call to EnumerateFunc failed\n");
-        return 1;
-    } else
-        return 0;
+    } 
 
+    return result;
 }
 
-bool EnumerateFunc(LPNETRESOURCEA lpnr)
+bool EnumerateFunc(NETRESOURCEA *lpnr,  owned_netresource[]* resources)
 {
     DWORD dwResult, dwResultEnum;
     HANDLE hEnum;
@@ -542,7 +574,7 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
 
     do {
         //
-        // Initialize the buffer.
+        // Initialize the buffer.owned_resouce
         //
         memset(lpnrLocal, 0, cbBuffer);
         //
@@ -561,14 +593,14 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
                 // Call an application-defined function to
                 //  display the contents of the NETRESOURCE structures.
                 //
-                DisplayStruct(i, &lpnrLocal[i]);
+                *resources ~= owned_netresource(lpnrLocal[i]);
 
                 // If the NETRESOURCE structure represents a container resource, 
                 //  call the EnumerateFunc function recursively.
 
                 if (RESOURCEUSAGE_CONTAINER == (lpnrLocal[i].dwUsage
                                                 & RESOURCEUSAGE_CONTAINER))
-                    if (!EnumerateFunc(&lpnrLocal[i]))
+                    if (!EnumerateFunc(&lpnrLocal[i], resources))
                         printf("EnumerateFunc returned false\n");
             }
         }
@@ -616,81 +648,6 @@ bool EnumerateFunc(LPNETRESOURCEA lpnr)
     return true;
 }
 
-void DisplayStruct(int i, LPNETRESOURCEA lpnrLocal)
-{
-    printf("NETRESOURCE[%d] Scope: ", i);
-    switch (lpnrLocal.dwScope) {
-    case (RESOURCE_CONNECTED):
-        printf("connected\n");
-        break;
-    case (RESOURCE_GLOBALNET):
-        printf("all resources\n");
-        break;
-    case (RESOURCE_REMEMBERED):
-        printf("remembered\n");
-        break;
-    default:
-        printf("unknown scope %d\n", lpnrLocal.dwScope);
-        break;
-    }
-
-    printf("NETRESOURCE[%d] Type: ", i);
-    switch (lpnrLocal.dwType) {
-    case (RESOURCETYPE_ANY):
-        printf("any\n");
-        break;
-    case (RESOURCETYPE_DISK):
-        printf("disk\n");
-        break;
-    case (RESOURCETYPE_PRINT):
-        printf("print\n");
-        break;
-    default:
-        printf("unknown type %d\n", lpnrLocal.dwType);
-        break;
-    }
-
-    printf("NETRESOURCE[%d] DisplayType: ", i);
-    switch (lpnrLocal.dwDisplayType) {
-    case (RESOURCEDISPLAYTYPE_GENERIC):
-        printf("generic\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_DOMAIN):
-        printf("domain\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_SERVER):
-        printf("server\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_SHARE):
-        printf("share\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_FILE):
-        printf("file\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_GROUP):
-        printf("group\n");
-        break;
-    case (RESOURCEDISPLAYTYPE_NETWORK):
-        printf("network\n");
-        break;
-    default:
-        printf("unknown display type %d\n", lpnrLocal.dwDisplayType);
-        break;
-    }
-
-    printf("NETRESOURCE[%d] Usage: 0x%x = ", i, lpnrLocal.dwUsage);
-    if (lpnrLocal.dwUsage & RESOURCEUSAGE_CONNECTABLE)
-        printf("connectable ");
-    if (lpnrLocal.dwUsage & RESOURCEUSAGE_CONTAINER)
-        printf("container ");
-    printf("\n");
-
-    printf("NETRESOURCE[%d] Localname: %s\n", i, lpnrLocal.lpLocalName);
-    printf("NETRESOURCE[%d] Remotename: %s\n", i, lpnrLocal.lpRemoteName);
-    printf("NETRESOURCE[%d] Comment: %s\n", i, lpnrLocal.lpComment);
-    printf("NETRESOURCE[%d] Provider: %s\n", i, lpnrLocal.lpProvider);
-    printf("\n");
-}
 //HRESULT FindComputers(IDirectorySearch *pContainerToSearch);  //  IDirectorySearch pointer to the container to search.
 
 void printExtendedError()
