@@ -405,53 +405,11 @@ void main(string[] args)
     }
 
 	writeln("let's enumerate all resources on the net");
-        kick_off();
-/*        HANDLE wnetEnumHandle;
-	WNetOpenEnumA(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEUSAGE_CONNECTABLE, null, &wnetEnumHandle);
-	uint count = -1;
-	uint bufferSize = 16 * 1024;
-	import core.stdc.stdlib;
-	NETRESOURCEA* resource = cast (NETRESOURCEA*)malloc(16 * 1024);
-	scope (exit) free(resource);
-	result = ERROR_ACCESS_DENIED;
-	result = WNetEnumResourceA(wnetEnumHandle, &count,  cast(void*)resource, &bufferSize);
-	if (result == ERROR_ACCESS_DENIED)
-    {
-        insufficientPermissions();
-    } else foreach(i; 0 .. count)
-    {
-        auto e = resource[i];
-        auto res_localname = e.lpLocalName ? cast(const)e.lpLocalName[0 .. strlen(e.lpLocalName)] : "";
-        auto res_remotename = e.lpRemoteName ? cast(const)e.lpRemoteName[0 .. strlen(e.lpRemoteName)] : "";
-        if (e.dwUsage & RESOURCEUSAGE_CONTAINER)
+        auto resources = kick_off();
+        foreach(i,resource;resources)
         {
-            iterate_resources(&e);
+            writeln("resource : " ,i, " ", resource);
         }
-
-        writeln("localName: ", res_localname, " RemoteName: ", res_remotename);
-		if (res_remotename == "Microsoft Windows Network")
-		{
-			HANDLE wnetEnumHandle2;
-			result = WNetOpenEnumA(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEUSAGE_CONNECTABLE, &e, &wnetEnumHandle2);
-			writeln("second WnetOpenEnumA: result", result);
-			uint count2 = -1;
-			uint bufferSize2 = 16 * 1024;
-			import core.stdc.stdlib;
-			NETRESOURCEA* resource2 = cast (NETRESOURCEA*)malloc(16 * 1024);
-			scope (exit) free(resource2);
-			result = WNetEnumResourceA(wnetEnumHandle2, &count2,  cast(void*)resource2, &bufferSize2);
-			if (result == ERROR_SUCCESS && count2 != -1) foreach(i2; 0 .. count2)
-			{
-				auto e2 = resource2[i2];
-				auto res_localname2 = e2.lpLocalName ? cast(const)e2.lpLocalName[0 .. strlen(e2.lpLocalName)] : "";
-				auto res_remotename2 = e2.lpRemoteName ? cast(const)e2.lpRemoteName[0 .. strlen(e2.lpRemoteName)] : "";
-                writeln("\tlocalName: ", res_localname2, " RemoteName: ", res_remotename2);
-			}
-			
-		}
-    }
-	WNetCloseEnum(wnetEnumHandle);
-*/	
 /*	
     SERVER_INFO_101 *ptrServer101;
     enum  SV_TYPE_NT =0x00001000;
@@ -502,7 +460,7 @@ struct owned_netresource
         provider = that.lpProvider[0 .. strlen(that.lpProvider)].idup;
     }
 
-
+/*
     string toString() pure const
     {
        string result;
@@ -519,7 +477,7 @@ struct owned_netresource
 
        return result;
     }
-
+*/
 }
 
 /*
