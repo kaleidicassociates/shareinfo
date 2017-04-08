@@ -231,28 +231,11 @@ extern (Windows) struct NETRESOURCEA {
     resource_type  dwType;
     resource_display_type  dwDisplayType;
     resource_usage dwUsage;
-    alias LPTSTR = CString;
+    alias LPTSTR = char*;
     LPTSTR lpLocalName;
     LPTSTR lpRemoteName;
     LPTSTR lpComment;
     LPTSTR lpProvider;
-
-    string toString() pure const
-    {
-       string result;
-
-       result ~= "dwScope: " ~ to!string(dwScope) ~ "\n";
-       result ~= "dwType: " ~ to!string(dwType) ~ "\n";
-       result ~= "dwDisplayType: " ~ to!string(dwDisplayType) ~ "\n";
-       result ~= "dwUsage: " ~ to!string(dwUsage) ~ "\n";
-
-       result ~= "lpLocalName: " ~ lpLocalName.toString ~ "\n";
-       result ~= "lpRemoteName: " ~ lpRemoteName.toString ~ "\n";
-       result ~= "lpComment: " ~ lpComment.toString ~ "\n";
-       result ~= "lpProvider: " ~ lpProvider.toString ~ "\n";
-
-       return result;
-    }
 }
 
 template wnet_get_last_error(bool isAscii)
@@ -510,7 +493,7 @@ struct owned_netresource
     {
         dwScope = that.dwScope;
         dwType = that.dwType;
-        dwDisplayType= that.dwDisplayType;
+        dwDisplayType = that.dwDisplayType;
         dwUsage = that.dwUsage;
 
         localName = that.lpLocalName[0 .. strlen(that.lpLocalName)].idup;
@@ -518,6 +501,25 @@ struct owned_netresource
         comment = that.lpComment[0 .. strlen(that.lpComment)].idup;
         provider = that.lpProvider[0 .. strlen(that.lpProvider)].idup;
     }
+
+
+    string toString() pure const
+    {
+       string result;
+
+       result ~= "dwScope: " ~ to!string(dwScope) ~ "\n";
+       result ~= "dwType: " ~ to!string(dwType) ~ "\n";
+       result ~= "dwDisplayType: " ~ to!string(dwDisplayType) ~ "\n";
+       result ~= "dwUsage: " ~ to!string(dwUsage) ~ "\n";
+
+       result ~= "localName: " ~ localName ~ "\n";
+       result ~= "remoteName: " ~ remoteName ~ "\n";
+       result ~= "comment: " ~ comment ~ "\n";
+       result ~= "provider: " ~ provider ~ "\n";
+
+       return result;
+    }
+
 }
 
 /*
