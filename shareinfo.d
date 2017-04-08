@@ -454,10 +454,10 @@ struct owned_netresource
         dwDisplayType = that.dwDisplayType;
         dwUsage = that.dwUsage;
 
-        localName = that.lpLocalName[0 .. strlen(that.lpLocalName)].idup;
-        remoteName = that.lpRemoteName[0 .. strlen(that.lpRemoteName)].idup;
-        comment = that.lpComment[0 .. strlen(that.lpComment)].idup;
-        provider = that.lpProvider[0 .. strlen(that.lpProvider)].idup;
+        localName = that.lpLocalName ? that.lpLocalName[0 .. strlen(that.lpLocalName)].idup : "";
+        remoteName = that.lpRemoteName ? that.lpRemoteName[0 .. strlen(that.lpRemoteName)].idup : "";
+        comment = that.lpComment ? that.lpComment[0 .. strlen(that.lpComment)].idup : "";
+        provider = that.lpProvider ? that.lpProvider[0 .. strlen(that.lpProvider)].idup : "";
     }
 
 /*
